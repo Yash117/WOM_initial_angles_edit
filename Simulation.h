@@ -58,6 +58,7 @@ protected:
     // device result data
     Vec3<value_t> * _hitpoints_dev{nullptr};
     Vec3<value_t> * _results_dev{nullptr}; // phi, theta and distance
+    Vec3<value_t> * _angles_init_dev{nullptr};
     int8_t * _status_codes_dev{nullptr};
 
     index_t * _sum_dev;
@@ -90,6 +91,15 @@ public:
     Vec3<value_t> * resultsDevice() const noexcept { return _results_dev; }
 
     [[deprecated]] int8_t * pmtHitDevice() const noexcept { return _status_codes_dev; }
+
+ /**
+     * @brief Access the angles_initial pointer on the device.
+     * @return The pointer.
+     */
+    Vec3<value_t> * angles_initial_Device() const noexcept { return _angles_init_dev; }
+
+
+
 
     /**
      * @brief Access the status_codes pointer on the device.
@@ -161,7 +171,8 @@ private:
 
         cudaMalloc(&_results_dev, _generator->N() * sizeof(Vec3<value_t>));
         CUERR
-
+        cudaMalloc(&_angles_init_dev, _generator->N() * sizeof(Vec3<value_t>));
+        CUERR
         cudaMalloc(&_status_codes_dev, _generator->N() * sizeof(int8_t));
         CUERR
 
@@ -184,30 +195,18 @@ public:
         Vec3<value_t> * directions = _generator->directionsDevice();
 
         // Invoke Kernel
-        startRayTracingLoop<<<BLOCKS, THREADS>>>(
+/*      startRayTracingLoop<<<BLOCKS, THREADS>>>(
             N, startpoints, directions, _hitpoints_dev, _results_dev, *_model, _alpha_crit, _state,
+            _status_codes_dev, _lambda_abs, _lambda_sc, _sum_dev); */
+		startRayTracingLoop<<<BLOCKS, THREADS>>>(
+            N, startpoints, directions, _hitpoints_dev, _results_dev, _angles_init_dev, *_model, _alpha_crit, _state,
             _status_codes_dev, _lambda_abs, _lambda_sc, _sum_dev);
-
-        index_t result_arr[4];
-
+            
         startComputeSum<<<BLOCKS, THREADS>>>(_status_codes_dev, _sum_dev, N,
                                              static_cast<int8_t>(HitResult::Success));
-        cudaMemcpy(result_arr, _sum_dev, sizeof(index_t), D2H); // copy result value from gpu
 
-        startComputeSum<<<BLOCKS, THREADS>>>(_status_codes_dev, _sum_dev, N,
-                                             static_cast<int8_t>(HitResult::ScatteredSuccess));
-        cudaMemcpy(result_arr + 1, _sum_dev, sizeof(index_t), D2H); // copy result value from gpu
-
-        startComputeSum<<<BLOCKS, THREADS>>>(_status_codes_dev, _sum_dev, N,
-                                             static_cast<int8_t>(HitResult::SuccessEnd));
-        cudaMemcpy(result_arr + 2, _sum_dev, sizeof(index_t), D2H); // copy result value from gpu
-
-        startComputeSum<<<BLOCKS, THREADS>>>(_status_codes_dev, _sum_dev, N,
-                                             static_cast<int8_t>(HitResult::ScatteredSuccessEnd));
-        cudaMemcpy(result_arr + 3, _sum_dev, sizeof(index_t), D2H); // copy result value from gpu
-
-
-        index_t result = result_arr[0] + result_arr[1] + result_arr[2] + result_arr[3];
+        index_t result{0};
+        cudaMemcpy(&result, _sum_dev, sizeof(index_t), D2H); // copy result value from gpu
 
         VERBOSE_OUT(result);
 
@@ -231,14 +230,17 @@ public:
      *
      * @param   hitpoints       Array of length 3*N() x0, y0, z0, x1, ...
      * @param   results         Array of length 3*N() x0, y0, z0, x1, ...
+     * @param   angles_initial  Array of length 3*N() x0, y0, z0, x1, ...
      * @param   status_codes    Array of length N()
      * @param   result          Array of length 1.
      */
     void simulateData(value_t * hitpoints,    // incoming numpy float array
-                      value_t * results,      // incoming numpy float array
+                      value_t * results,
+					  value_t * angles_initial,      // incoming numpy float array
                       int32_t * status_codes, // incoming numpy int8_t array
                       index_t * result)       // incoming uint32
     {
+  
         *result = this->simulate();
 
         cudaMemcpy(reinterpret_cast<Vec3<value_t> *>(hitpoints), _hitpoints_dev,
@@ -247,11 +249,16 @@ public:
         cudaMemcpy(reinterpret_cast<Vec3<value_t> *>(results), _results_dev,
                    sizeof(Vec3<value_t>) * _generator->N(), D2H);
         CUERR;
-
+		cudaMemcpy(reinterpret_cast<Vec3<value_t> *>(angles_initial), _angles_init_dev,
+                   sizeof(Vec3<value_t>) * _generator->N(), D2H);
+        CUERR;
+		
+		
         std::vector<int8_t> codes(_generator->N());
         cudaMemcpy(codes.data(), _status_codes_dev, sizeof(int8_t) * _generator->N(), D2H);
         CUERR;
 
+        
         for (size_t i = 0; i < codes.size(); ++i) //
             status_codes[i] = static_cast<int32_t>(codes[i]);
     }
@@ -307,6 +314,7 @@ private:
     {
         freeStorage(_hitpoints_dev);
         freeStorage(_results_dev);
+        freeStorage(_angles_init_dev);
         freeStorage(_status_codes_dev);
         freeStorage(_sum_dev);
     }

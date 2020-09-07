@@ -29,6 +29,7 @@ namespace ALGO
  * @param   hitpoints       Stores the final positions of the photons.
  * @param   results         Stores the total travelled distance and angles to
  *                          the end surface of each photon.
+ * @param   angles_initial  Stores the initial emission angles of the rays
  * @param   ray_id          Current ray processing.
  * @param   model           The intersection model.
  * @param   alpha_crit      The critical angle of total internal reflection.
@@ -42,7 +43,8 @@ template <typename value_t, typename index_t, typename model_t, bool override = 
 __device__ __forceinline__ void rayTracingLoop(Vec3<value_t> * startpoints, //
                                                Vec3<value_t> * directions,  //
                                                Vec3<value_t> * hitpoints,   //
-                                               Vec3<value_t> * results,     //
+                                               Vec3<value_t> * results,
+											   Vec3<value_t> * angles_initial,     //
                                                index_t ray_id,              //
                                                model_t & model,             //
                                                value_t alpha_crit,          //
@@ -51,8 +53,15 @@ __device__ __forceinline__ void rayTracingLoop(Vec3<value_t> * startpoints, //
                                                value_t lambda_abs,          //
                                                value_t lambda_sc)
 {
+	
     Vec3<value_t> normal, dir{directions[ray_id]}, hit{startpoints[ray_id]};
-
+    
+	angles_initial[ray_id] = {
+            value_t(atan2(-dir.x, -dir.y) + M_PI), //
+            value_t(acos(dir.z)), 
+			dist_abs                              //
+        };
+        
     if (dir.x == 0 && dir.y == 0 && dir.z == 0)
     {
         status_codes[ray_id] = static_cast<int8_t>(HitResult::Failed);
@@ -146,6 +155,7 @@ __device__ __forceinline__ void rayTracingLoop(Vec3<value_t> * startpoints, //
  * @param   hitpoints       Stores the final positions of the photons.
  * @param   results         Stores the total travelled distance and angles to
  *                          the end surface of each photon.
+ * @param   angles_initial  Stores the initial emission angles of the rays
  * @param   model           The intersection model.
  * @param   alpha_crit      The critical angle of total internal reflection.
  * @param   state           The random states.
@@ -159,7 +169,8 @@ __global__ void startRayTracingLoop(index_t num_rays,            //
                                     Vec3<value_t> * startpoints, //
                                     Vec3<value_t> * directions,  //
                                     Vec3<value_t> * hitpoints,   //
-                                    Vec3<value_t> * results,     //
+                                    Vec3<value_t> * results,
+									Vec3<value_t> * angles_initial,     //
                                     model_t model,               //
                                     value_t alpha_crit,          //
                                     curandState * state,         //
@@ -168,6 +179,7 @@ __global__ void startRayTracingLoop(index_t num_rays,            //
                                     value_t lambda_sc,           //
                                     index_t * schedule_counter = nullptr)
 {
+	
     index_t idx = blockDim.x * blockIdx.x + threadIdx.x;
     curandState localstate = state[idx];
 
@@ -180,7 +192,7 @@ __global__ void startRayTracingLoop(index_t num_rays,            //
         while (ray_id < num_rays)
         {
             rayTracingLoop<value_t, index_t, model_t, override>(
-                startpoints, directions, hitpoints, results, ray_id, model, alpha_crit,
+                startpoints, directions, hitpoints, results, angles_initial, ray_id, model, alpha_crit,
                 status_codes, localstate, lambda_abs, lambda_sc);
             ray_id = atomicAdd(schedule_counter, 1);
         }
@@ -192,7 +204,7 @@ __global__ void startRayTracingLoop(index_t num_rays,            //
         for (index_t ray_id = idx; ray_id < num_rays; ray_id += num_threads)
         {
             rayTracingLoop<value_t, index_t, model_t, override>(
-                startpoints, directions, hitpoints, results, ray_id, model, alpha_crit,
+                startpoints, directions, hitpoints, results, angles_initial, ray_id, model, alpha_crit,
                 status_codes, localstate, lambda_abs, lambda_sc);
         }
     }

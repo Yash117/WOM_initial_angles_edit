@@ -345,7 +345,7 @@ private:
             {
                 PhotonWriter<value_t, index_t> writer(
                     _output_file, generator->N(), simulation->hitpointsDevice(),
-                    simulation->resultsDevice(), simulation->statusDevice(), false); // TODO: Flag
+                    simulation->resultsDevice(), simulation->angles_initial_Device(), simulation->statusDevice(), false); // TODO: Flag
                 writer.write();
             }
             catch (const std::exception & e)
@@ -518,10 +518,27 @@ public:
     int run() const
     {
         // Wraps template paramters needed.
+#if (__CUDA_ARCH__ >= 700)
+        if (_N > UINT32_MAX && _precision)
+        {
+            return performRun<double, uint64_t>();
+        }
+        else if (N > UINT32_MAX)
+        {
+            return performRun<float, uint64_t>();
+        }
+        else
+#else
         if (_N > UINT32_MAX)
         {
-            std::cerr << "> ERROR: Choose smaller number of photons. Double precision is not supported.\n";
+            std::cerr << "> ERROR: Choose smaller number of photons. Your device does not "
+                         "support large values (>2^32-1) (Requires >sm_70).\n";
             exit(-1);
+        }
+#endif
+            if (_precision)
+        {
+            return performRun<double, uint32_t>();
         }
         else
         {

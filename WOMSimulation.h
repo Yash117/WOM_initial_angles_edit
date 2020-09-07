@@ -14,20 +14,17 @@
 #include "Simulation.h"
 #include "SortKernels.h"
 
-
 namespace ALGO
 {
 
 /**
  * @brief   Class which allows a full simulation run. Note that it overrides the startpoints and
  *          directions of each Photon. So the simulation can only be run ONCE.
- * 
- *          This class is not supported as of version 1.2.0.
  *
  * @author  Ronja Schnur (rschnur@students.uni-mainz.de)
  */
 template <typename value_t, typename index_t>
-class [[deprecated]] WOMSimulation final : public Simulation<value_t, index_t, EllipticModel<value_t, index_t>>
+class WOMSimulation final : public Simulation<value_t, index_t, EllipticModel<value_t, index_t>>
 {
     // Data
 private:
@@ -36,7 +33,7 @@ private:
 
     // Constructors
 public:
-    [[deprecated]] WOMSimulation(value_t n1,                                      //
+    WOMSimulation(value_t n1,                                      //
                   value_t n2,                                      //
                   value_t lambda_abs,                              //
                   value_t lambda_sc,                               //
@@ -151,7 +148,8 @@ public:
                                           startpoints,             //
                                           directions,              //
                                           this->_hitpoints_dev,    //
-                                          this->_results_dev,      //
+                                          this->_results_dev,      
+										  this->_angles_init_dev,
                                           *_elliptic_model.get(),  //
                                           this->_alpha_crit,       //
                                           this->_state,            //
@@ -176,7 +174,8 @@ public:
                                           startpoints,             //
                                           directions,              //
                                           this->_hitpoints_dev,    //
-                                          this->_results_dev,      //
+                                          this->_results_dev, 
+										  this->_angles_init_dev,     
                                           *_spline_model.get(),    //
                                           this->_alpha_crit,       //
                                           this->_state,            //

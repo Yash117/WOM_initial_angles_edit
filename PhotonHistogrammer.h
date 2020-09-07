@@ -33,7 +33,8 @@ private:
     std::string _filename;
 
     index_t _N;
-    Vec3<value_t> *_hitpoints_dev, *_results_dev;
+//    Vec3<value_t> *_hitpoints_dev, *_results_dev;
+    Vec3<value_t> *_hitpoints_dev, *_results_dev, *_angles_init_dev;
     int8_t * _status_code_dev;
 
     My::Intervall<value_t> _intervall;
@@ -41,6 +42,7 @@ private:
     value_t _delta;
     std::vector<std::vector<index_t>> _data;
     std::vector<index_t> _results;
+    std::vector<index_t> _angles_initial;
     std::vector<std::vector<value_t>> _spline_data;
     std::vector<value_t> _spaces_x;
 
@@ -49,14 +51,15 @@ public:
     /**
      * @brief   Create new instance.
      *
-     * @param   filename        The file where the data will be stored.
-     * @param   N               How many photons are on the GPU
-     * @param   hitpoints_dev   The device pointer to hitpoints.
-     * @param   results_dev     The device pointer to results.
-     * @param   status_code_dev The device pointer to status_code_dev
-     * @param   cartesian       Whether to convert the result direction into cartesian coordinates.
+     * @param   filename           The file where the data will be stored.
+     * @param   N                  How many photons are on the GPU
+     * @param   hitpoints_dev      The device pointer to hitpoints.
+     * @param   results_dev        The device pointer to results.
+     * @param   _angles_init_dev   The device pointer to initial emission angles
+     * @param   status_code_dev    The device pointer to status_code_dev
+     * @param   cartesian          Whether to convert the result direction into cartesian coordinates.
      */
-    PhotonHistogrammer(std::string filename, My::Intervall<value_t> intervall, size_t num_spaces,
+/*    PhotonHistogrammer(std::string filename, My::Intervall<value_t> intervall, size_t num_spaces,
                        index_t N, Vec3<value_t> * hitpoints_dev, Vec3<value_t> * results_dev,
                        int8_t * status_code_dev)
         : _filename{filename}, _N{N}, _hitpoints_dev{hitpoints_dev}, _results_dev{results_dev},
@@ -66,8 +69,18 @@ public:
     {
         for (value_t i = 0; i < _spaces_x.size(); ++i)
             _spaces_x[i] = _intervall._start + i * _delta; // equally distributed x-values
+    }*/ 
+    PhotonHistogrammer(std::string filename, My::Intervall<value_t> intervall, size_t num_spaces,
+                       index_t N, Vec3<value_t> * hitpoints_dev, Vec3<value_t> * results_dev, Vec3<value_t> * angles_init_dev,
+                       int8_t * status_code_dev)
+        : _filename{filename}, _N{N}, _hitpoints_dev{hitpoints_dev}, _results_dev{results_dev}, _angles_init_dev{angles_init_dev},
+          _status_code_dev{status_code_dev},
+          _intervall{intervall}, _delta{(intervall._end - intervall._start) / num_spaces},
+          _spaces_x(num_spaces + 1)
+    {
+        for (value_t i = 0; i < _spaces_x.size(); ++i)
+            _spaces_x[i] = _intervall._start + i * _delta; // equally distributed x-values
     }
-
     // Methods
 public:
     /**
@@ -105,6 +118,7 @@ public:
 
         _data.push_back(data);
         _results.push_back(result);
+        _angles_initial.push_back(result);
         _spline_data.push_back(spline_data);
     }
 
@@ -132,6 +146,7 @@ public:
         {
             for (index_t entry : _data[i]) fs << std::setw(10) << std::right << entry << ' ';
             fs << "# " << std::setw(10) << std::right << _results[i] << " # ";
+            fs << "# " << std::setw(10) << std::right << _angles_initial[i] << " # ";
             for (value_t spline_entry : _spline_data[i])
                 fs << std::setw(10) << std::setprecision(6) << std::right << spline_entry << ' ';
             fs << "\n";
